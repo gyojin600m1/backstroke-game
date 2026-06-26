@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<title>超・背泳ぎタイムアタック</title>
+<meta name="description" content="iPhone / Android / PCで遊べる、1ファイル完結の背泳ぎタイムアタックゲーム。">
+<meta property="og:title" content="超・背泳ぎタイムアタック">
+<meta property="og:description" content="壁キックスタート、15m浮上、クイックターン、左右交互ストロークで記録を狙え。">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #020816;
+    --panel: rgba(8, 20, 38, .94);
+    --panel2: rgba(3, 12, 26, .96);
+    --line: rgba(93, 213, 255, .28);
+    --cyan: #23e8ff;
+    --cyan2: #9af6ff;
+    --blue: #3087ff;
+    --green: #54f2a2;
+    --gold: #ffd166;
+    --red: #ff5b7d;
+    --text: #f1fbff;
+    --muted: #9bb8cc;
+    --vh: 100dvh;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "Noto Sans JP", "Segoe UI", sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+  body { position: fixed; inset: 0; }
+  button, input { font: inherit; }
+  button { cursor: pointer; }
+  #game {
+    display: block;
+    width: 100vw;
+    height: var(--vh);
+    background: #020816;
+    touch-action: none;
+  }
+  .hidden { display: none !important; }
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: max(14px, env(safe-area-inset-top)) 14px max(18px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    background:
+      radial-gradient(circle at 50% 0%, rgba(35, 232, 255, .16), transparent 34%),
+      linear-gradient(180deg, rgba(1, 8, 20, .98), rgba(2, 8, 22, .96));
+  }
+  .wrap { width: min(450px, 100%); margin: auto 0; padding: 10px 0; }
+  h1 {
+    margin: 0;
+    font-size: clamp(27px, 8vw, 42px);
+    line-height: 1.12;
+    text-align: center;
+    letter-spacing: 0;
+    color: transparent;
+    background: linear-gradient(90deg, #e9fbff, #23e8ff 45%, #2f86ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+  .sub {
+    margin: 8px 0 14px;
+    color: var(--cyan);
+    font-size: 12px;
+    font-weight: 900;
+    text-align: center;
+    letter-spacing: .14em;
+  }
+  .panel {
+    width: 100%;
+    margin: 10px 0;
+    padding: 13px 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(8, 20, 38, .88);
+    box-shadow: inset 0 0 24px rgba(5, 18, 34, .8), 0 16px 40px rgba(0, 0, 0, .22);
+  }
+  .panel p { margin: 0; color: #cdefff; font-size: 12.5px; line-height: 1.72; }
+  .panel b { color: var(--gold); }
+  .label {
+    width: 100%;
+    margin: 2px 0 7px;
+    color: #7fc8e8;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .1em;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .opt {
+    flex: 1 1 0;
+    min-width: 104px;
+    min-height: 44px;
+    padding: 8px 10px;
+    border: 1px solid #234465;
+    border-radius: 8px;
+    background: #0c2038;
+    color: #caeaff;
+    font-size: 14px;
+    font-weight: 900;
+  }
+  .opt.on {
+    border-color: var(--cyan);
+    color: #06111d;
+    background: linear-gradient(135deg, var(--cyan), #56a8ff);
+    box-shadow: 0 0 18px rgba(35, 232, 255, .34);
+  }
+  #nameInput {
+    width: 100%;
+    min-height: 48px;
+    padding: 12px 13px;
+    border: 1px solid #255071;
+    border-radius: 8px;
+    outline: none;
+    background: #020b18;
+    color: var(--cyan2);
+    font-size: 16px;
+    font-weight: 800;
+    text-align: center;
+    user-select: text;
+    -webkit-user-select: text;
+    touch-action: manipulation;
+  }
+  #nameInput::placeholder { color: #55798d; }
+  .btn {
+    width: 100%;
+    min-height: 54px;
+    margin-top: 10px;
+    border: 0;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #23e8ff, #247cff);
+    color: #03101d;
+    font-size: 17px;
+    font-weight: 900;
+    letter-spacing: .08em;
+    box-shadow: 0 6px 20px rgba(35, 232, 255, .34);
+  }
+  .btn:active, .opt:active, .tap:active { transform: scale(.97); }
+  .btn.sec {
+    min-height: 46px;
+    border: 1px solid #265579;
+    background: linear-gradient(135deg, #103453, #071c31);
+    color: #c6eeff;
+    font-size: 13px;
+    box-shadow: none;
+  }
+  .btn.share { background: linear-gradient(135deg, #1d9bf0, #0d72bf); color: #fff; }
+  .best { min-height: 20px; color: var(--gold); font-size: 13px; font-weight: 900; text-align: center; }
+  .hud {
+    position: fixed;
+    top: max(8px, env(safe-area-inset-top));
+    left: 8px;
+    right: 8px;
+    z-index: 5;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    pointer-events: none;
+  }
+  .hud-card, .clock, .pc-help, .feedback > div {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(2, 10, 24, .76);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, .3);
+  }
+  .hud-card { min-width: 0; padding: 8px 10px; }
+  .race-row { display: flex; justify-content: space-between; gap: 8px; color: #cdeaff; font-size: 12px; font-weight: 900; line-height: 1.2; }
+  .bar { position: relative; height: 8px; margin-top: 7px; overflow: hidden; border-radius: 999px; background: rgba(145, 190, 220, .18); }
+  .bar > span { position: absolute; inset: 0 auto 0 0; width: 0%; border-radius: inherit; background: linear-gradient(90deg, var(--cyan), var(--blue)); box-shadow: 0 0 14px rgba(35, 232, 255, .42); }
+  .mini { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; margin-top: 8px; }
+  .mini-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 10px; font-weight: 900; }
+  .mini .bar { height: 6px; margin-top: 4px; }
+  #staminaBar { background: linear-gradient(90deg, var(--green), var(--gold)); }
+  #postureBar { background: linear-gradient(90deg, #5ed0ff, #fff); }
+  #oxygenBar { background: linear-gradient(90deg, var(--cyan), #dffcff); }
+  .clock { min-width: 96px; padding: 9px 10px; text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+  .clock-label { color: var(--muted); font-size: 10px; font-weight: 900; }
+  .clock-time { margin-top: 2px; color: var(--cyan); font-size: 23px; font-weight: 900; line-height: 1; }
+  .feedback {
+    position: fixed;
+    top: max(102px, calc(env(safe-area-inset-top) + 88px));
+    left: 12px;
+    right: 12px;
+    z-index: 8;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .feedback > div {
+    max-width: min(440px, 92vw);
+    padding: 10px 13px;
+    color: var(--cyan2);
+    font-size: 15px;
+    font-weight: 900;
+    text-align: center;
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: opacity .14s ease, transform .14s ease;
+  }
+  .feedback.show > div { opacity: 1; transform: translateY(0); }
+  .pc-help {
+    position: fixed;
+    top: max(96px, calc(env(safe-area-inset-top) + 82px));
+    right: 10px;
+    z-index: 6;
+    width: 218px;
+    padding: 10px;
+    color: #dbf4ff;
+    font-size: 12px;
+    line-height: 1.58;
+    pointer-events: none;
+  }
+  kbd {
+    display: inline-flex;
+    min-width: 25px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    margin: 0 2px;
+    border: 1px solid rgba(108, 224, 255, .4);
+    border-radius: 5px;
+    background: #0c223b;
+    color: #fff;
+    font: 900 11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .24);
+  }
+  .controls {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    z-index: 7;
+    display: grid;
+    grid-template-columns: 1fr 1.05fr 1fr;
+    gap: 8px;
+    touch-action: none;
+  }
+  .tap {
+    min-height: 86px;
+    padding: 8px;
+    border: 1px solid rgba(80, 210, 255, .36);
+    border-radius: 8px;
+    background: linear-gradient(180deg, rgba(10, 44, 74, .88), rgba(4, 18, 34, .94));
+    color: #dffbff;
+    font-weight: 900;
+    box-shadow: inset 0 0 20px rgba(22, 160, 210, .18);
+    touch-action: none;
+  }
+  .tap strong { display: block; font-size: 18px; }
+  .tap span { display: block; margin-top: 5px; color: #8edcff; font-size: 11px; line-height: 1.25; }
+  .tap.center { border-color: rgba(255, 209, 102, .48); background: linear-gradient(180deg, rgba(42, 46, 58, .94), rgba(11, 25, 43, .96)); color: var(--gold); }
+  .board {
+    width: 100%;
+    margin: 12px 0;
+    padding: 14px;
+    border: 1px solid #255071;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #041220, #020816);
+    color: var(--gold);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+  .time { font-size: clamp(40px, 13vw, 58px); font-weight: 900; line-height: 1.05; text-align: center; text-shadow: 0 0 14px rgba(255, 209, 102, .35); }
+  .rankTitle { margin-top: 7px; color: var(--green); font-size: 21px; font-weight: 900; text-align: center; }
+  .newbest { margin-top: 7px; color: var(--red); font-size: 15px; font-weight: 900; text-align: center; }
+  .metric { display: flex; justify-content: space-between; gap: 10px; padding-top: 7px; margin-top: 7px; border-top: 1px dashed #284963; color: #ffd88a; font-size: 12px; }
+  .ranking { margin: 8px 0 0; padding: 0; list-style: none; }
+  .ranking li { display: grid; grid-template-columns: 32px 1fr auto; gap: 8px; padding: 7px 0; border-top: 1px solid rgba(115, 180, 220, .16); color: #d7f3ff; font-size: 12px; align-items: center; }
+  .ranking .rankNo { color: var(--cyan); font-weight: 900; }
+  .small { color: var(--muted); font-size: 11px; line-height: 1.55; text-align: center; }
+  @media (max-width: 720px) {
+    .pc-help { display: none; }
+    .hud { grid-template-columns: minmax(0, 1fr) 92px; }
+    .clock-time { font-size: 20px; }
+    .controls { gap: 7px; }
+    .tap { min-height: 80px; }
+    .tap strong { font-size: 16px; }
+  }
+  @media (max-width: 360px) {
+    .mini { grid-template-columns: 1fr 1fr; }
+    .tap { min-height: 76px; padding: 7px 4px; }
+    .tap span { font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="超・背泳ぎタイムアタックのゲーム画面"></canvas>
+
+<div class="hud hidden" id="hud">
+  <div class="hud-card">
+    <div class="race-row"><span id="raceInfo">50m / 一般</span><span id="phaseInfo">待機</span></div>
+    <div class="bar"><span id="progressBar"></span></div>
+    <div class="mini">
+      <div><div class="mini-label"><span>STAMINA</span><span id="staminaTxt">100</span></div><div class="bar"><span id="staminaBar"></span></div></div>
+      <div><div class="mini-label"><span>POSTURE</span><span id="postureTxt">100</span></div><div class="bar"><span id="postureBar"></span></div></div>
+      <div><div class="mini-label"><span>15m</span><span id="oxygenTxt">0.0</span></div><div class="bar"><span id="oxygenBar"></span></div></div>
+    </div>
+  </div>
+  <div class="clock"><div class="clock-label">TIME</div><div class="clock-time" id="clockTime">0.00</div></div>
+</div>
+
+<div class="feedback" id="feedback"><div id="feedbackText"></div></div>
+<div class="pc-help hidden" id="pcHelp"><b>PC操作</b><br><kbd>F</kbd> 左腕　<kbd>J</kbd> 右腕<br><kbd>Space</kbd> 浮上 / 姿勢 / ターン</div>
+
+<div class="controls hidden" id="controls">
+  <button class="tap" id="leftTap" type="button"><strong>左ゾーン</strong><span>左腕ストローク<br>潜水中はバサロ</span></button>
+  <button class="tap center" id="centerTap" type="button"><strong id="centerLabel">浮上</strong><span>水上では姿勢<br>ターンもここ</span></button>
+  <button class="tap" id="rightTap" type="button"><strong>右ゾーン</strong><span>右腕ストローク<br>潜水中はバサロ</span></button>
+</div>
+
+<section class="overlay" id="titleOverlay">
+  <div class="wrap">
+    <h1>超・背泳ぎタイムアタック</h1>
+    <div class="sub">SUPER BACKSTROKE TIME ATTACK</div>
+    <div class="panel">
+      <p><b>スマホ: 左右交互 / 中央で浮上・姿勢　PC: F・J / Space</b><br>背泳ぎ専用の壁キックスタート。15m手前で浮上し、左右交互ストローク、ローリング、姿勢、リズム、スタミナを整えて記録を狙います。</p>
+    </div>
+    <div class="panel">
+      <div class="label">選手名</div>
+      <input id="nameInput" maxlength="14" placeholder="SWIMMER" autocomplete="off" inputmode="text">
+      <div class="row"><div class="label">距離</div><button class="opt on" data-distance="50" type="button">50m</button><button class="opt" data-distance="100" type="button">100m</button></div>
+      <div class="row"><div class="label">難易度</div><button class="opt on" data-difficulty="一般" type="button">一般</button><button class="opt" data-difficulty="県大会" type="button">県大会</button><button class="opt" data-difficulty="全国" type="button">全国</button></div>
+      <div class="best" id="bestLine">自己ベスト: --</div>
+      <button class="btn" id="startBtn" type="button">スタート準備</button>
+    </div>
+    <div class="panel">
+      <p>合図前に入力するとフライング失格。スタート直後とターン後は水中バサロ。<b>15mを超えて潜水すると失格</b>です。5mフラッグが見えたらターン位置を意識してください。</p>
+    </div>
+    <p class="small">GitHub Pages公開向けの1ファイルHTML。外部CDN、外部画像、外部ライブラリは使いません。</p>
+  </div>
+</section>
+
+<section class="overlay hidden" id="resultOverlay">
+  <div class="wrap">
+    <h1>RESULT</h1>
+    <div class="sub">SUPER BACKSTROKE TIME ATTACK</div>
+    <div class="board" id="resultBoard"></div>
+    <div class="panel"><div class="label">ローカルランキング TOP10</div><ol class="ranking" id="rankingList"></ol></div>
+    <button class="btn" id="copyBtn" type="button">結果テキストコピー</button>
+    <button class="btn share" id="shareBtn" type="button">Xで共有</button>
+    <button class="btn sec" id="retryBtn" type="button">もう一度泳ぐ</button>
+    <button class="btn sec" id="menuBtn" type="button">タイトルへ戻る</button>
+  </div>
+</section>
+
+<script>
+(function () {
+  'use strict';
+
+  var canvas = document.getElementById('game');
+  var ctx = canvas.getContext('2d');
+  var hud = document.getElementById('hud');
+  var controls = document.getElementById('controls');
+  var pcHelp = document.getElementById('pcHelp');
+  var titleOverlay = document.getElementById('titleOverlay');
+  var resultOverlay = document.getElementById('resultOverlay');
+  var feedback = document.getElementById('feedback');
+  var feedbackText = document.getElementById('feedbackText');
+  var raceInfo = document.getElementById('raceInfo');
+  var phaseInfo = document.getElementById('phaseInfo');
+  var progressBar = document.getElementById('progressBar');
+  var staminaBar = document.getElementById('staminaBar');
+  var postureBar = document.getElementById('postureBar');
+  var oxygenBar = document.getElementById('oxygenBar');
+  var staminaTxt = document.getElementById('staminaTxt');
+  var postureTxt = document.getElementById('postureTxt');
+  var oxygenTxt = document.getElementById('oxygenTxt');
+  var clockTime = document.getElementById('clockTime');
+  var centerLabel = document.getElementById('centerLabel');
+  var nameInput = document.getElementById('nameInput');
+  var bestLine = document.getElementById('bestLine');
+  var resultBoard = document.getElementById('resultBoard');
+  var rankingList = document.getElementById('rankingList');
+
+  var STORAGE_KEY = 'superBackstrokeTimeAttack:v1';
+  var BEST_KEY = 'superBackstrokeTimeAttack:best:v1';
+  var selectedDistance = 50;
+  var selectedDifficulty = '一般';
+  var audioCtx = null;
+  var lastFrame = 0;
+  var rafId = 0;
+  var feedbackTimer = 0;
+  var lastResultText = '';
+
+  var diffMap = {
+    '一般': { speed: 1.08, drag: .88, stamina: .82, target: .54, turn: 1.2, rank: 1.08 },
+    '県大会': { speed: 1.0, drag: 1.0, stamina: 1.0, target: .49, turn: 1.0, rank: 1.0 },
+    '全国': { speed: .94, drag: 1.12, stamina: 1.18, target: .45, turn: .78, rank: .92 }
+  };
+
+  var game = makeGame();
+
+  function makeGame() {
+    return {
+      mode: 'menu',
+      distanceGoal: selectedDistance,
+      difficulty: selectedDifficulty,
+      name: 'SWIMMER',
+      sequenceText: '',
+      sequenceStep: '',
+      sequenceAt: 0,
+      signalAt: 0,
+      raceStartAt: 0,
+      elapsed: 0,
+      distance: 0,
+      speed: 0,
+      phase: 'idle',
+      underwaterStart: 0,
+      underwaterMeters: 0,
+      turned: false,
+      split50: null,
+      reaction: null,
+      firstInputDone: false,
+      stamina: 1,
+      posture: 1,
+      rollBias: 0,
+      lastSide: '',
+      lastStrokeAt: 0,
+      lastKickAt: 0,
+      combo: 0,
+      maxCombo: 0,
+      rhythmSum: 0,
+      rhythmCount: 0,
+      stabilitySum: 0,
+      stabilityCount: 0,
+      strokes: 0,
+      turnBonus: 0,
+      spurt: false,
+      disqualified: false,
+      disqReason: '',
+      finished: false,
+      finishTime: 0,
+      result: null
+    };
+  }
+
+  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+  function now() { return performance && performance.now ? performance.now() : Date.now(); }
+  function fmt(sec) { return (Math.max(0, sec)).toFixed(2); }
+  function fmtTime(sec) {
+    sec = Math.max(0, sec || 0);
+    var m = Math.floor(sec / 60);
+    var s = sec - m * 60;
+    return m > 0 ? m + ':' + (s < 10 ? '0' : '') + s.toFixed(2) : s.toFixed(2);
+  }
+
+  function safeGet(key, fallback) {
+    try {
+      var raw = window.localStorage ? localStorage.getItem(key) : null;
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (e) { return fallback; }
+  }
+  function safeSet(key, value) {
+    try {
+      if (window.localStorage) localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {}
+  }
+  function safeVibrate(ms) {
+    try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {}
+  }
+  function safeSpeak(text) {
+    try {
+      if (!window.speechSynthesis) return;
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-US';
+      u.rate = .95;
+      u.volume = .75;
+      speechSynthesis.cancel();
+      speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+  function initAudio() {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      if (!audioCtx) audioCtx = new AC();
+      if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+      return audioCtx;
+    } catch (e) { return null; }
+  }
+  function beep(freq, duration, type) {
+    try {
+      var ac = initAudio();
+      if (!ac) return;
+      var osc = ac.createOscillator();
+      var gain = ac.createGain();
+      osc.type = type || 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(.0001, ac.currentTime);
+      gain.gain.exponentialRampToValueAtTime(.18, ac.currentTime + .015);
+      gain.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(ac.destination);
+      osc.start();
+      osc.stop(ac.currentTime + duration + .02);
+    } catch (e) {}
+  }
+
+  function resizeCanvas() {
+    var vv = window.visualViewport;
+    var w = vv ? vv.width : window.innerWidth;
+    var h = vv ? vv.height : window.innerHeight;
+    document.documentElement.style.setProperty('--vh', h + 'px');
+    var dpr = Math.max(1, Math.min(2.5, window.devicePixelRatio || 1));
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function showFeedback(text, tone) {
+    feedbackText.textContent = text;
+    feedbackText.style.color = tone === 'bad' ? '#ff7892' : tone === 'good' ? '#54f2a2' : '#9af6ff';
+    feedback.classList.add('show');
+    clearTimeout(feedbackTimer);
+    feedbackTimer = setTimeout(function () { feedback.classList.remove('show'); }, 900);
+  }
+
+  function updateBestLine() {
+    var key = selectedDistance + 'm-' + selectedDifficulty;
+    var bests = safeGet(BEST_KEY, {});
+    bestLine.textContent = bests[key] ? '自己ベスト: ' + fmtTime(bests[key].time) + ' / ' + bests[key].name : '自己ベスト: --';
+  }
+
+  function setOption(button, selector, attr) {
+    var list = document.querySelectorAll(selector);
+    for (var i = 0; i < list.length; i++) list[i].classList.remove('on');
+    button.classList.add('on');
+    if (attr === 'distance') selectedDistance = parseInt(button.getAttribute('data-distance'), 10);
+    if (attr === 'difficulty') selectedDifficulty = button.getAttribute('data-difficulty');
+    updateBestLine();
+  }
+
+  function startSequence() {
+    initAudio();
+    selectedDistance = selectedDistance || 50;
+    selectedDifficulty = selectedDifficulty || '一般';
+    game = makeGame();
+    game.mode = 'sequence';
+    game.distanceGoal = selectedDistance;
+    game.difficulty = selectedDifficulty;
+    game.name = (nameInput.value || 'SWIMMER').trim().slice(0, 14) || 'SWIMMER';
+    game.sequenceStep = 'grip';
+    game.sequenceText = '入水。スタートグリップを握れ';
+    game.sequenceAt = now();
+    game.signalAt = 0;
+    lastFrame = now();
+    titleOverlay.classList.add('hidden');
+    resultOverlay.classList.add('hidden');
+    hud.classList.remove('hidden');
+    controls.classList.remove('hidden');
+    pcHelp.classList.remove('hidden');
+    raceInfo.textContent = game.distanceGoal + 'm / ' + game.difficulty;
+    phaseInfo.textContent = 'スタート準備';
+    clockTime.textContent = '0.00';
+    centerLabel.textContent = '浮上';
+    showFeedback('入水してスタートグリップを握る', 'good');
+    safeVibrate(35);
+  }
+
+  function raceSignal() {
+    game.mode = 'race';
+    game.phase = 'underwater';
+    game.sequenceText = 'GO';
+    game.raceStartAt = now();
+    game.underwaterStart = 0;
+    game.underwaterMeters = 0;
+    game.speed = 1.15;
+    phaseInfo.textContent = '水中バサロ';
+    showFeedback('電子音。壁を蹴ってスタート', 'good');
+    beep(1180, .22, 'square');
+    safeVibrate([40, 28, 40]);
+  }
+
+  function disqualify(reason) {
+    if (game.finished) return;
+    game.disqualified = true;
+    game.disqReason = reason;
+    game.mode = 'result';
+    game.finished = true;
+    game.finishTime = game.elapsed;
+    beep(170, .45, 'sawtooth');
+    safeVibrate([90, 50, 90]);
+    showResult(true);
+  }
+
+  function startRaceIfSequenceReady(t) {
+    if (game.mode !== 'sequence') return;
+    var elapsed = (t - game.sequenceAt) / 1000;
+    if (game.sequenceStep === 'grip' && elapsed >= 1.15) {
+      game.sequenceStep = 'marks';
+      game.sequenceText = 'Take your marks';
+      game.sequenceAt = t;
+      game.signalAt = t + 950 + Math.random() * 1350;
+      safeSpeak('Take your marks');
+      showFeedback('Take your marks', 'good');
+      beep(520, .1, 'sine');
+    } else if (game.sequenceStep === 'marks' && t >= game.signalAt) {
+      raceSignal();
+    }
+  }
+
+  function inputBeforeSignal() {
+    if (game.mode === 'sequence') {
+      disqualify('フライング: 合図前に入力しました');
+      return true;
+    }
+    return false;
+  }
+
+  function handleSide(side) {
+    if (inputBeforeSignal()) return;
+    if (game.mode !== 'race') return;
+    if (!game.firstInputDone) {
+      game.firstInputDone = true;
+      game.reaction = (now() - game.raceStartAt) / 1000;
+    }
+    if (game.phase === 'underwater') underwaterKick(side);
+    else surfaceStroke(side);
+  }
+
+  function underwaterKick(side) {
+    var t = now();
+    var d = game.lastKickAt ? (t - game.lastKickAt) / 1000 : .28;
+    var target = .26;
+    var q = clamp(1 - Math.abs(d - target) / .28, .35, 1.18);
+    var cfg = diffMap[game.difficulty];
+    game.lastKickAt = t;
+    game.speed += .28 * q * cfg.speed * (1 + game.turnBonus);
+    game.speed = clamp(game.speed, .8, 4.7);
+    game.stamina = clamp(game.stamina - .006 * cfg.stamina, 0, 1);
+    game.rollBias *= .88;
+    game.posture = clamp(game.posture + .006, .2, 1);
+    showFeedback(q > .9 ? '鋭いバサロキック' : 'バサロのリズムを一定に', q > .9 ? 'good' : '');
+  }
+
+  function surfaceStroke(side) {
+    var cfg = diffMap[game.difficulty];
+    var t = now();
+    var d = game.lastStrokeAt ? (t - game.lastStrokeAt) / 1000 : cfg.target;
+    game.strokes += 1;
+    var alternate = game.lastSide && game.lastSide !== side;
+    if (!game.lastSide) alternate = true;
+    var err = Math.abs(d - cfg.target);
+    game.rhythmSum += err;
+    game.rhythmCount += 1;
+    if (side === 'left') game.rollBias -= .22;
+    else game.rollBias += .22;
+    game.rollBias = clamp(game.rollBias, -1, 1);
+
+    if (!alternate) {
+      game.combo = 0;
+      game.posture = clamp(game.posture - .13, .12, 1);
+      game.speed += .08 * cfg.speed;
+      showFeedback('同じ側が続いた。体がブレて減速', 'bad');
+    } else {
+      var rhythmQ = clamp(1 - err / .38, .2, 1.22);
+      var rollQ = clamp(1 - Math.abs(game.rollBias) * .28, .55, 1.1);
+      var postureQ = clamp(.55 + game.posture * .55, .5, 1.12);
+      var spurtBoost = game.spurt ? 1.14 : 1;
+      var add = .38 * rhythmQ * rollQ * postureQ * cfg.speed * spurtBoost;
+      game.speed += add;
+      game.combo += 1;
+      game.maxCombo = Math.max(game.maxCombo, game.combo);
+      if (rhythmQ > .95) {
+        game.posture = clamp(game.posture + .018, .12, 1);
+        showFeedback('左右交互ストローク ' + game.combo + ' combo', 'good');
+      } else {
+        game.posture = clamp(game.posture - .018, .12, 1);
+        showFeedback(d < cfg.target ? '少し速すぎる。リズムを戻す' : '少し遅い。テンポを上げる', '');
+      }
+    }
+    game.lastSide = side;
+    game.lastStrokeAt = t;
+    game.stamina = clamp(game.stamina - (.014 + (game.spurt ? .008 : 0)) * cfg.stamina, 0, 1);
+  }
+
+  function handleCenter() {
+    if (inputBeforeSignal()) return;
+    if (game.mode !== 'race') return;
+    if (!game.firstInputDone) {
+      game.firstInputDone = true;
+      game.reaction = (now() - game.raceStartAt) / 1000;
+    }
+    if (game.phase === 'underwater') {
+      surfaceNow();
+      return;
+    }
+    if (tryTurn()) return;
+    game.posture = clamp(game.posture + .18, .12, 1);
+    game.rollBias *= .45;
+    game.speed = Math.max(.5, game.speed - .05);
+    showFeedback('姿勢を整えた。上向きの軸を回復', 'good');
+  }
+
+  function surfaceNow() {
+    var m = game.distance - game.underwaterStart;
+    if (m > 15) {
+      disqualify('15m超過: 浮上が遅れました');
+      return;
+    }
+    game.phase = 'surface';
+    game.underwaterMeters = m;
+    game.speed *= m < 8 ? .92 : 1.03;
+    phaseInfo.textContent = game.spurt ? 'ラストスパート' : '水上ストローク';
+    centerLabel.textContent = '姿勢';
+    showFeedback(m < 8 ? '早めの浮上。安全だが少しロス' : '15m手前で浮上成功', 'good');
+    beep(740, .08, 'triangle');
+    safeVibrate(24);
+  }
+
+  function distanceToTurnWall() {
+    if (game.distanceGoal !== 100 || game.turned) return 999;
+    return 50 - game.distance;
+  }
+
+  function tryTurn() {
+    var toWall = distanceToTurnWall();
+    if (toWall === 999) return false;
+    if (toWall <= 6.0 && toWall > 3.2) {
+      executeTurn('early', toWall);
+      return true;
+    }
+    if (toWall <= 3.2 && toWall >= .45) {
+      executeTurn('good', toWall);
+      return true;
+    }
+    if (toWall < .45 && toWall > -1.6) {
+      executeTurn('late', toWall);
+      return true;
+    }
+    return false;
+  }
+
+  function executeTurn(kind, toWall) {
+    game.turned = true;
+    game.distance = 50;
+    game.phase = 'underwater';
+    game.underwaterStart = 50;
+    game.underwaterMeters = 0;
+    centerLabel.textContent = '浮上';
+    game.lastKickAt = 0;
+    game.lastSide = '';
+    var abs = Math.abs(toWall - 1.2);
+    if (kind === 'good' && abs < .55) {
+      game.speed = Math.max(game.speed + .92, 3.6);
+      game.turnBonus = .16;
+      game.posture = clamp(game.posture + .08, .12, 1);
+      showFeedback('クイックターン成功。壁を強く蹴った', 'good');
+      beep(960, .14, 'square');
+    } else if (kind === 'good') {
+      game.speed = Math.max(game.speed + .35, 2.8);
+      game.turnBonus = .06;
+      showFeedback('ターン成功。もう少し壁際で合わせたい', 'good');
+      beep(820, .1, 'triangle');
+    } else if (kind === 'early') {
+      game.speed = Math.max(game.speed * .72, 1.7);
+      game.posture = clamp(game.posture - .13, .12, 1);
+      game.turnBonus = 0;
+      showFeedback('ターンが早い。壁まで伸びきれず減速', 'bad');
+      beep(260, .18, 'sawtooth');
+    } else {
+      game.speed = Math.max(game.speed * .64, 1.5);
+      game.posture = clamp(game.posture - .16, .12, 1);
+      game.turnBonus = 0;
+      showFeedback('ターンが遅い。壁で詰まって減速', 'bad');
+      beep(220, .18, 'sawtooth');
+    }
+    safeVibrate(kind === 'good' ? [25, 22, 25] : 75);
+  }
+
+  function update(dt, t) {
+    startRaceIfSequenceReady(t);
+    if (game.mode !== 'race') return;
+    game.elapsed = (t - game.raceStartAt) / 1000;
+    var cfg = diffMap[game.difficulty];
+    game.spurt = game.distanceGoal - game.distance <= 10;
+    if (game.spurt && game.phase === 'surface') phaseInfo.textContent = 'ラストスパート';
+
+    var drag = (game.phase === 'underwater' ? .62 : .88) * cfg.drag;
+    var postureDrag = game.phase === 'surface' ? (1 - game.posture) * .78 + Math.abs(game.rollBias) * .22 : 0;
+    var staminaDrag = game.stamina < .28 ? (.28 - game.stamina) * 1.25 : 0;
+    game.speed -= (drag + postureDrag + staminaDrag) * dt;
+    if (game.phase === 'surface' && game.stamina < .92) game.stamina = clamp(game.stamina + .018 * dt, 0, 1);
+    if (game.phase === 'surface') game.posture = clamp(game.posture - (.012 + Math.abs(game.rollBias) * .01) * dt, .12, 1);
+    game.rollBias *= Math.pow(.32, dt);
+    game.turnBonus *= Math.pow(.25, dt);
+    game.speed = clamp(game.speed, 0, game.phase === 'underwater' ? 5.25 : (game.spurt ? 4.9 : 4.55));
+
+    var prev = game.distance;
+    game.distance += game.speed * dt;
+
+    if (game.distanceGoal === 100 && !game.turned && game.distance >= 50) {
+      game.split50 = game.elapsed;
+      executeTurn('late', -0.1);
+    }
+    if (game.split50 === null && prev < 50 && game.distance >= 50) game.split50 = game.elapsed;
+
+    if (game.phase === 'underwater') {
+      game.underwaterMeters = game.distance - game.underwaterStart;
+      phaseInfo.textContent = game.underwaterMeters > 13.6 ? '浮上しろ' : '水中バサロ';
+      centerLabel.textContent = '浮上';
+      if (game.underwaterMeters > 15) {
+        disqualify('15m超過: 潜水距離 ' + game.underwaterMeters.toFixed(1) + 'm');
+        return;
+      }
+    } else {
+      centerLabel.textContent = distanceToTurnWall() <= 6 ? 'ターン' : '姿勢';
+    }
+
+    game.stabilitySum += game.posture;
+    game.stabilityCount += 1;
+
+    if (game.distance >= game.distanceGoal) finishRace();
+  }
+
+  function finishRace() {
+    if (game.finished) return;
+    game.finished = true;
+    game.mode = 'result';
+    game.finishTime = game.elapsed;
+    beep(1320, .18, 'square');
+    setTimeout(function () { beep(1660, .16, 'square'); }, 150);
+    safeVibrate([35, 24, 35, 24, 60]);
+    showResult(false);
+  }
+
+  function makeRank(time, goal, difficulty, stability, rhythm, combo) {
+    var base = goal === 50 ? 30 : 66;
+    base *= diffMap[difficulty].rank;
+    var score = 100;
+    score -= Math.max(0, time - base) * 3.2;
+    score += Math.max(0, base - time) * 1.4;
+    score += (stability - 80) * .35;
+    score -= rhythm * 42;
+    score += Math.min(combo, 24) * .45;
+    if (score >= 104) return 'SS';
+    if (score >= 94) return 'S';
+    if (score >= 82) return 'A';
+    if (score >= 68) return 'B';
+    if (score >= 52) return 'C';
+    return 'D';
+  }
+
+  function buildResult(disq) {
+    var avgRhythm = game.rhythmCount ? game.rhythmSum / game.rhythmCount : 0;
+    var stability = game.stabilityCount ? game.stabilitySum / game.stabilityCount * 100 : game.posture * 100;
+    var rank = disq ? 'DQ' : makeRank(game.finishTime, game.distanceGoal, game.difficulty, stability, avgRhythm, game.maxCombo);
+    return {
+      name: game.name,
+      distance: game.distanceGoal,
+      difficulty: game.difficulty,
+      time: game.finishTime,
+      reaction: game.reaction,
+      split50: game.distanceGoal === 50 ? game.finishTime : game.split50,
+      rhythm: avgRhythm,
+      combo: game.maxCombo,
+      stability: stability,
+      rank: rank,
+      disq: disq,
+      reason: game.disqReason,
+      date: new Date().toISOString()
+    };
+  }
+
+  function saveResult(result) {
+    if (result.disq) return false;
+    var key = result.distance + 'm-' + result.difficulty;
+    var bests = safeGet(BEST_KEY, {});
+    var isBest = !bests[key] || result.time < bests[key].time;
+    if (isBest) {
+      bests[key] = { time: result.time, name: result.name, date: result.date };
+      safeSet(BEST_KEY, bests);
+    }
+    var ranks = safeGet(STORAGE_KEY, []);
+    ranks.push(result);
+    ranks = ranks.filter(function (r) { return r && !r.disq && r.distance === result.distance && r.difficulty === result.difficulty; });
+    ranks.sort(function (a, b) { return a.time - b.time; });
+    ranks = ranks.slice(0, 10);
+    var all = safeGet(STORAGE_KEY + ':all', []);
+    all.push(result);
+    safeSet(STORAGE_KEY + ':all', all.slice(-80));
+    safeSet(STORAGE_KEY + ':' + key, ranks);
+    return isBest;
+  }
+
+  function getRanking(distance, difficulty) {
+    return safeGet(STORAGE_KEY + ':' + distance + 'm-' + difficulty, []);
+  }
+
+  function resultText(result, isBest) {
+    if (result.disq) {
+      return '超・背泳ぎタイムアタック\n' + result.name + ' / ' + result.distance + 'm / ' + result.difficulty + '\n結果: 失格(DQ)\n理由: ' + result.reason;
+    }
+    return '超・背泳ぎタイムアタック\n' +
+      result.name + ' / ' + result.distance + 'm / ' + result.difficulty + '\n' +
+      '記録: ' + fmtTime(result.time) + (isBest ? ' 自己ベスト更新' : '') + '\n' +
+      '反応: ' + (result.reaction === null ? '--' : result.reaction.toFixed(3) + '秒') + ' / 50m: ' + fmtTime(result.split50) + '\n' +
+      '平均リズム誤差: ' + result.rhythm.toFixed(3) + '秒 / 最高コンボ: ' + result.combo + '\n' +
+      '姿勢安定度: ' + Math.round(result.stability) + ' / ランク: ' + result.rank;
+  }
+
+  function showResult(disq) {
+    hud.classList.add('hidden');
+    controls.classList.add('hidden');
+    pcHelp.classList.add('hidden');
+    titleOverlay.classList.add('hidden');
+    resultOverlay.classList.remove('hidden');
+    game.result = buildResult(disq);
+    var isBest = saveResult(game.result);
+    lastResultText = resultText(game.result, isBest);
+    var r = game.result;
+    if (r.disq) {
+      resultBoard.innerHTML = '<div class="time">DQ</div><div class="rankTitle">失格</div><div class="newbest">' + escapeHtml(r.reason) + '</div>';
+    } else {
+      resultBoard.innerHTML =
+        '<div class="time">' + fmtTime(r.time) + '</div>' +
+        '<div class="rankTitle">RANK ' + r.rank + '</div>' +
+        (isBest ? '<div class="newbest">自己ベスト更新</div>' : '') +
+        '<div class="metric"><span>反応時間</span><b>' + (r.reaction === null ? '--' : r.reaction.toFixed(3) + '秒') + '</b></div>' +
+        '<div class="metric"><span>50m通過</span><b>' + fmtTime(r.split50) + '</b></div>' +
+        '<div class="metric"><span>平均リズム誤差</span><b>' + r.rhythm.toFixed(3) + '秒</b></div>' +
+        '<div class="metric"><span>最高コンボ</span><b>' + r.combo + '</b></div>' +
+        '<div class="metric"><span>姿勢安定度</span><b>' + Math.round(r.stability) + '</b></div>';
+    }
+    renderRanking(r.distance, r.difficulty);
+    updateBestLine();
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function renderRanking(distance, difficulty) {
+    var ranks = getRanking(distance, difficulty);
+    rankingList.innerHTML = '';
+    if (!ranks.length) {
+      var li = document.createElement('li');
+      li.innerHTML = '<span class="rankNo">--</span><span>まだ記録がありません</span><b>--</b>';
+      rankingList.appendChild(li);
+      return;
+    }
+    ranks.forEach(function (r, i) {
+      var li = document.createElement('li');
+      li.innerHTML = '<span class="rankNo">' + (i + 1) + '</span><span>' + escapeHtml(r.name) + ' <small>' + r.rank + '</small></span><b>' + fmtTime(r.time) + '</b>';
+      rankingList.appendChild(li);
+    });
+  }
+
+  function copyResult() {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(lastResultText).then(function () { showFeedback('結果をコピーしました', 'good'); }).catch(function () { fallbackCopy(); });
+      } else fallbackCopy();
+    } catch (e) { fallbackCopy(); }
+  }
+  function fallbackCopy() {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = lastResultText;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showFeedback('結果をコピーしました', 'good');
+    } catch (e) { showFeedback('コピーできませんでした', 'bad'); }
+  }
+
+  function shareX() {
+    var url = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(lastResultText + '\n#超背泳ぎタイムアタック');
+    try { window.open(url, '_blank', 'noopener,noreferrer'); } catch (e) { location.href = url; }
+  }
+
+  function updateHud() {
+    var pct = clamp(game.distance / game.distanceGoal * 100, 0, 100);
+    progressBar.style.width = pct + '%';
+    staminaBar.style.width = Math.round(game.stamina * 100) + '%';
+    postureBar.style.width = Math.round(game.posture * 100) + '%';
+    var uwPct = game.phase === 'underwater' ? clamp(game.underwaterMeters / 15 * 100, 0, 100) : 0;
+    oxygenBar.style.width = uwPct + '%';
+    staminaTxt.textContent = Math.round(game.stamina * 100);
+    postureTxt.textContent = Math.round(game.posture * 100);
+    oxygenTxt.textContent = game.phase === 'underwater' ? game.underwaterMeters.toFixed(1) : '0.0';
+    clockTime.textContent = fmt(game.elapsed);
+    raceInfo.textContent = game.distanceGoal + 'm / ' + game.difficulty + ' / ' + Math.min(game.distanceGoal, game.distance).toFixed(1) + 'm';
+  }
+
+  function draw() {
+    var w = canvas.clientWidth || window.innerWidth;
+    var h = canvas.clientHeight || window.innerHeight;
+    ctx.clearRect(0, 0, w, h);
+    drawWater(w, h);
+    drawLane(w, h);
+    drawFlags(w, h);
+    drawSwimmer(w, h);
+    drawStartText(w, h);
+  }
+
+  function drawWater(w, h) {
+    var g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#071a31');
+    g.addColorStop(.45, '#062846');
+    g.addColorStop(1, '#020816');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    var t = now() / 1000;
+    ctx.globalAlpha = .36;
+    for (var i = 0; i < 18; i++) {
+      var y = (i / 18) * h + Math.sin(t * 1.3 + i) * 8;
+      ctx.strokeStyle = i % 3 === 0 ? 'rgba(180,246,255,.22)' : 'rgba(54,147,255,.14)';
+      ctx.lineWidth = i % 3 === 0 ? 2 : 1;
+      ctx.beginPath();
+      for (var x = -20; x <= w + 20; x += 22) {
+        var yy = y + Math.sin(x * .025 + t * 2.4 + i) * 5;
+        if (x === -20) ctx.moveTo(x, yy);
+        else ctx.lineTo(x, yy);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(255,255,255,.07)';
+    for (var s = 0; s < 9; s++) {
+      var sx = (s * 97 + t * 22) % (w + 140) - 70;
+      ctx.fillRect(sx, h * .18 + Math.sin(t + s) * 28, 80, 2);
+    }
+  }
+
+  function drawLane(w, h) {
+    var left = w * .15;
+    var right = w * .85;
+    var top = h * .14;
+    var bottom = h - 128;
+    ctx.strokeStyle = 'rgba(154,246,255,.2)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(left, top, right - left, bottom - top);
+    drawRope(left, top, bottom, 'left');
+    drawRope(right, top, bottom, 'right');
+    var poolPos = ((game.distance % 50) + 50) % 50;
+    var wallOffset = game.phase === 'idle' ? 0 : poolPos / 50;
+    ctx.globalAlpha = .3;
+    ctx.fillStyle = '#dffcff';
+    for (var i = 0; i < 7; i++) {
+      var y = bottom - ((wallOffset * h * .9 + i * 88) % (bottom - top + 120));
+      ctx.fillRect(left + 9, y, right - left - 18, 1);
+    }
+    ctx.globalAlpha = 1;
+    drawWall(w, h, top, bottom, poolPos);
+  }
+
+  function drawRope(x, top, bottom, side) {
+    var t = now() / 1000;
+    for (var y = top; y < bottom; y += 18) {
+      var k = Math.floor(y / 18);
+      ctx.fillStyle = k % 2 === 0 ? '#23e8ff' : '#f1fbff';
+      ctx.beginPath();
+      ctx.arc(x + Math.sin(t * 2 + y * .03) * 2, y, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = side === 'left' ? 'rgba(35,232,255,.12)' : 'rgba(48,135,255,.12)';
+    ctx.fillRect(x - 2, top, 4, bottom - top);
+  }
+
+  function drawWall(w, h, top, bottom, poolPos) {
+    var toNextWall = 50 - poolPos;
+    var near = Math.min(poolPos, toNextWall);
+    if (near < 7 || game.mode === 'sequence') {
+      var alpha = clamp(1 - near / 7, .15, .85);
+      var y = poolPos < 5 || game.mode === 'sequence' ? bottom - 32 : top + 32;
+      ctx.fillStyle = 'rgba(214,246,255,' + alpha + ')';
+      ctx.fillRect(w * .18, y - 7, w * .64, 14);
+      ctx.fillStyle = 'rgba(35,232,255,' + alpha + ')';
+      ctx.fillRect(w * .2, y - 2, w * .6, 4);
+    }
+  }
+
+  function drawFlags(w, h) {
+    var poolPos = ((game.distance % 50) + 50) % 50;
+    var distToFlag = Math.min(Math.abs(poolPos - 5), Math.abs(poolPos - 45));
+    var top = h * .14;
+    var bottom = h - 128;
+    if (distToFlag < 8 || game.mode === 'menu') {
+      var y = poolPos < 25 ? bottom - clamp((poolPos - 2) / 8, 0, 1) * 150 : top + clamp((47 - poolPos) / 8, 0, 1) * 150;
+      ctx.strokeStyle = 'rgba(255,255,255,.55)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(w * .12, y);
+      ctx.lineTo(w * .88, y);
+      ctx.stroke();
+      var colors = ['#23e8ff', '#ffffff', '#ffd166', '#3087ff'];
+      for (var i = 0; i < 13; i++) {
+        var x = w * .14 + i * (w * .72 / 12);
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + 10, y);
+        ctx.lineTo(x + 5, y + 14);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.fillStyle = 'rgba(255,209,102,.9)';
+      ctx.font = '900 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('5m FLAGS', w / 2, y - 8);
+    }
+  }
+
+  function drawSwimmer(w, h) {
+    var x = w / 2;
+    var y = h * .57;
+    if (h < 620) y = h * .52;
+    var t = now() / 1000;
+    var roll = game.rollBias * .25 + Math.sin(t * 4.8) * .04;
+    var bob = Math.sin(t * 5 + game.distance) * 4;
+    ctx.save();
+    ctx.translate(x, y + bob);
+    ctx.rotate(roll);
+    if (game.phase === 'underwater') {
+      ctx.globalAlpha = .28;
+      ctx.fillStyle = '#bdf8ff';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 48, 105, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,.7)';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    var armSwing = Math.sin(t * 8 + game.strokes * .6);
+    drawArm(-18, -36, -42, -72 - armSwing * 22, -24, -102);
+    drawArm(18, -36, 42, -72 + armSwing * 22, 24, -102);
+    ctx.fillStyle = '#89eaff';
+    ctx.beginPath();
+    ctx.ellipse(0, -14, 21, 48, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f4d3bd';
+    ctx.beginPath();
+    ctx.ellipse(0, -64, 16, 18, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#071a31';
+    ctx.fillRect(-10, -72, 20, 6);
+    ctx.strokeStyle = '#77dfff';
+    ctx.lineWidth = 3;
+    var kick = game.phase === 'underwater' ? Math.sin(t * 18) * 18 : Math.sin(t * 8) * 8;
+    drawLeg(-8, 28, -18, 80, -24, 105 + kick);
+    drawLeg(8, 28, 18, 80, 24, 105 - kick);
+    ctx.restore();
+
+    if (game.phase === 'underwater') {
+      ctx.fillStyle = 'rgba(154,246,255,.16)';
+      for (var i = 0; i < 6; i++) {
+        ctx.beginPath();
+        ctx.arc(x - 55 + i * 18, y + 82 + Math.sin(t * 5 + i) * 8, 3 + i % 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  function drawArm(x1, y1, x2, y2, x3, y3) {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.quadraticCurveTo(x2, y2, x3, y3);
+    ctx.stroke();
+  }
+  function drawLeg(x1, y1, x2, y2, x3, y3) {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.quadraticCurveTo(x2, y2, x3, y3);
+    ctx.stroke();
+  }
+
+  function drawStartText(w, h) {
+    if (game.mode !== 'sequence') return;
+    ctx.fillStyle = 'rgba(2,8,22,.45)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#f1fbff';
+    ctx.textAlign = 'center';
+    ctx.font = '900 ' + Math.max(23, Math.min(42, w * .08)) + 'px sans-serif';
+    ctx.fillText(game.sequenceText, w / 2, h * .38);
+    ctx.font = '800 14px sans-serif';
+    ctx.fillStyle = '#9af6ff';
+    ctx.fillText('合図前入力はフライング失格', w / 2, h * .38 + 34);
+  }
+
+  function loop(t) {
+    var dt = lastFrame ? Math.min(.05, (t - lastFrame) / 1000) : .016;
+    lastFrame = t;
+    update(dt, t);
+    updateHud();
+    draw();
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function bindButton(id, handler) {
+    var el = document.getElementById(id);
+    var active = false;
+    function fire(ev) {
+      if (ev) ev.preventDefault();
+      if (active) return;
+      active = true;
+      handler();
+      setTimeout(function () { active = false; }, 38);
+    }
+    el.addEventListener('pointerdown', fire, { passive: false });
+    el.addEventListener('touchstart', fire, { passive: false });
+    el.addEventListener('click', function (ev) { ev.preventDefault(); }, { passive: false });
+  }
+
+  document.querySelectorAll('[data-distance]').forEach(function (btn) {
+    btn.addEventListener('click', function () { setOption(btn, '[data-distance]', 'distance'); });
+  });
+  document.querySelectorAll('[data-difficulty]').forEach(function (btn) {
+    btn.addEventListener('click', function () { setOption(btn, '[data-difficulty]', 'difficulty'); });
+  });
+  document.getElementById('startBtn').addEventListener('click', startSequence);
+  document.getElementById('copyBtn').addEventListener('click', copyResult);
+  document.getElementById('shareBtn').addEventListener('click', shareX);
+  document.getElementById('retryBtn').addEventListener('click', function () { resultOverlay.classList.add('hidden'); startSequence(); });
+  document.getElementById('menuBtn').addEventListener('click', function () {
+    resultOverlay.classList.add('hidden');
+    titleOverlay.classList.remove('hidden');
+    game = makeGame();
+    hud.classList.add('hidden');
+    controls.classList.add('hidden');
+    pcHelp.classList.add('hidden');
+  });
+  bindButton('leftTap', function () { handleSide('left'); });
+  bindButton('rightTap', function () { handleSide('right'); });
+  bindButton('centerTap', handleCenter);
+
+  window.addEventListener('keydown', function (ev) {
+    if (document.activeElement === nameInput) return;
+    if (ev.repeat) return;
+    var key = ev.key.toLowerCase();
+    if (key === 'f') { ev.preventDefault(); handleSide('left'); }
+    else if (key === 'j') { ev.preventDefault(); handleSide('right'); }
+    else if (ev.code === 'Space' || key === ' ') { ev.preventDefault(); handleCenter(); }
+  }, { passive: false });
+
+  window.addEventListener('touchmove', function (ev) {
+    if (!titleOverlay.classList.contains('hidden') || !resultOverlay.classList.contains('hidden')) return;
+    ev.preventDefault();
+  }, { passive: false });
+  window.addEventListener('gesturestart', function (ev) { ev.preventDefault(); }, { passive: false });
+  window.addEventListener('resize', resizeCanvas);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', resizeCanvas);
+    window.visualViewport.addEventListener('scroll', resizeCanvas);
+  }
+
+  resizeCanvas();
+  updateBestLine();
+  rafId = requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
