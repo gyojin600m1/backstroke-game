@@ -13,7 +13,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>超・背泳ぎ タイムアタック</title>
-<meta name="description" content="背泳ぎを上向きにした動きで遊ぶ、1ファイル完結の背泳ぎタイムアタックゲーム。">
+<meta name="description" content="自由形を上向きにした動きで遊ぶ、1ファイル完結の背泳ぎタイムアタックゲーム。">
 <meta property="og:title" content="超・背泳ぎ タイムアタック">
 <meta property="og:description" content="壁キックスタート、バサロ、15m浮上、上向き交互ストロークで記録を狙え。">
 <style>
@@ -153,7 +153,7 @@
     <div class="text-red-500 font-black tracking-wider mb-2 text-4xl animate-bounce">失 格</div>
     <div id="fsTitle" class="text-xs tracking-widest text-red-400 mb-4">FALSE START</div>
     <div class="bg-red-950/40 border border-red-900/60 rounded-xl p-4 mx-auto mb-6">
-      <p class="text-xs text-red-200 leading-relaxed" id="fsMsg">合図より早く壁キックました！水泳界においてフライングは一発失格の厳しい世界です…！</p>
+      <p class="text-xs text-red-200 leading-relaxed" id="fsMsg">合図より早く動きました！背泳ぎでもフライングは一発失格です。電子音を聞いてから壁を蹴りましょう！</p>
     </div>
     <button id="retryBtn" class="w-full py-3 rounded-full bg-slate-800 border border-slate-700 text-slate-200 font-bold text-sm">もう一度挑戦</button>
   </div>
@@ -452,7 +452,7 @@ function disqualify(msg, voice, title) {
 
 function falseStart() {
   disqualify(
-    "焦ってしまいました！合図（電子音）が鳴る前に壁を蹴むと一発失格です。次こそ完璧な反応を狙いましょう！",
+    "焦ってしまいました！合図（電子音）が鳴る前に動くと一発失格です。次こそ完璧な反応を狙いましょう！",
     "失格。フライングです",
     "FALSE START"
   );
@@ -559,7 +559,7 @@ function stroke(side, now) {
   const dt = (now - G.lastTapT) / 1000;
   G.strokes++;
 
-  // 姿勢をすると姿勢が減る
+  // ストロークを重ねると姿勢ゲージが少しずつ崩れる
   if (!spurt) {
     G.oxygen = Math.max(0, G.oxygen - 6); // 1かきごとに姿勢ゲージが少し崩れる
   }
@@ -591,7 +591,7 @@ function stroke(side, now) {
       } else {
         q = 0.55; label = "タイミング不良"; color = "#ffa801"; sndOk();
       }
-      // 泳ぎ出し・姿勢明けの1かき目はdtが不定のためリズム統計に含めない
+      // 泳ぎ出し・姿勢リセット直後の1かき目はdtが不定のためリズム統計に含めない
       G.rhythmSum += Math.round(err * 1000); G.rhythmN++;
     }
 
@@ -707,7 +707,7 @@ function update(now) {
   // 速度自然減速
   if (G.underwater) {
     G.vel = Math.max(0.8, G.vel * Math.exp(-0.55 * dt)); // キックを止めると失速
-    G.oxygen = Math.max(0, G.oxygen - 11 * dt);          // 潜水中は息が続かず姿勢が減る
+    G.oxygen = Math.max(0, G.oxygen - 11 * dt);          // 潜水中は15mラインへ向けて姿勢ゲージを減らす
   } else {
     G.vel = Math.max(0, G.vel * Math.exp(-0.95 * dt));
   }
@@ -839,7 +839,7 @@ function draw(now) {
     cx.globalAlpha = 1;
   }
 
-  // ★ 潜水(ドルフィン)中：15m潜水限界ラインと距離ゲージ ★
+  // ★ 潜水(バサロ)中：15m潜水限界ラインと距離ゲージ ★
   if (state === S.SWIM && G.dove && G.underwater) {
     const span = L.poolBottom - L.poolTop;
     const odd = (G.leg % 2 === 1);
