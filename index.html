@@ -443,6 +443,8 @@
       stabilityCount: 0,
       strokes: 0,
       turnBonus: 0,
+      pendingTurn: '',
+      strobeAt: 0,
       spurt: false,
       disqualified: false,
       disqReason: '',
@@ -574,6 +576,7 @@
     clockTime.textContent = '0.00';
     centerLabel.textContent = '浮上';
     showFeedback('入水してスタートグリップを握る', 'good');
+    beep(2350, .45, 'triangle');
     safeVibrate(35);
   }
 
@@ -584,7 +587,8 @@
     game.raceStartAt = now();
     game.underwaterStart = 0;
     game.underwaterMeters = 0;
-    game.speed = 1.15;
+    game.speed = 2.6;
+    game.strobeAt = now();
     phaseInfo.textContent = '水中バサロ';
     showFeedback('電子音。壁を蹴ってスタート', 'good');
     beep(1180, .22, 'square');
@@ -635,6 +639,7 @@
       game.reaction = (now() - game.raceStartAt) / 1000;
     }
     if (game.phase === 'underwater') underwaterKick(side);
+    else if (game.phase === 'turnglide') showFeedback('ターン動作中。壁を待て', '');
     else surfaceStroke(side);
   }
 
@@ -645,8 +650,8 @@
     var q = clamp(1 - Math.abs(d - target) / .28, .35, 1.18);
     var cfg = diffMap[game.difficulty];
     game.lastKickAt = t;
-    game.speed += .28 * q * cfg.speed * (1 + game.turnBonus);
-    game.speed = clamp(game.speed, .8, 4.7);
+    // ターン直後などキャップ超えの高速グライドをキックで殺さない
+    game.speed = Math.max(game.speed, clamp(game.speed + .15 * q * cfg.speed * (1 + game.turnBonus), .5, 2.4));
     game.stamina = clamp(game.stamina - .006 * cfg.stamina, 0, 1);
     game.rollBias *= .88;
     game.posture = clamp(game.posture + .006, .2, 1);
@@ -656,13 +661,18 @@
   function surfaceStroke(side) {
     var cfg = diffMap[game.difficulty];
     var t = now();
-    var d = game.lastStrokeAt ? (t - game.lastStrokeAt) / 1000 : cfg.target;
+    var measured = !!game.lastStrokeAt;
+    var d = measured ? (t - game.lastStrokeAt) / 1000 : cfg.target;
     game.strokes += 1;
     var alternate = game.lastSide && game.lastSide !== side;
     if (!game.lastSide) alternate = true;
     var err = Math.abs(d - cfg.target);
-    game.rhythmSum += err;
-    game.rhythmCount += 1;
+    // 泳ぎ出し直後や長い中断明けの1かき目はdtが不定のためリズム統計に含めない
+    var fresh = !measured || d >= 1.5;
+    if (!fresh) {
+      game.rhythmSum += err;
+      game.rhythmCount += 1;
+    }
     if (side === 'left') game.rollBias -= .22;
     else game.rollBias += .22;
     game.rollBias = clamp(game.rollBias, -1, 1);
@@ -670,23 +680,27 @@
     if (!alternate) {
       game.combo = 0;
       game.posture = clamp(game.posture - .13, .12, 1);
-      game.speed += .08 * cfg.speed;
+      game.speed += .04 * cfg.speed;
       showFeedback('同じ側が続いた。体がブレて減速', 'bad');
     } else {
-      var rhythmQ = clamp(1 - err / .38, .2, 1.22);
+      var rhythmQ = fresh ? 1.0 : clamp(1 - err / .38, .4, 1.22);
       var rollQ = clamp(1 - Math.abs(game.rollBias) * .28, .55, 1.1);
       var postureQ = clamp(.55 + game.posture * .55, .5, 1.12);
       var spurtBoost = game.spurt ? 1.14 : 1;
-      var add = .38 * rhythmQ * rollQ * postureQ * cfg.speed * spurtBoost;
+      var add = .22 * rhythmQ * rollQ * postureQ * cfg.speed * spurtBoost;
       game.speed += add;
       game.combo += 1;
       game.maxCombo = Math.max(game.maxCombo, game.combo);
-      if (rhythmQ > .95) {
-        game.posture = clamp(game.posture + .018, .12, 1);
+      if (fresh) {
+        showFeedback('よい泳ぎ出し。リズムを刻め', 'good');
+      } else if (rhythmQ >= .85) {
+        game.posture = clamp(game.posture + .015, .12, 1);
         showFeedback('左右交互ストローク ' + game.combo + ' combo', 'good');
+      } else if (rhythmQ >= .7) {
+        showFeedback(d < cfg.target ? 'ややピッチが速い' : 'ややピッチが遅い', '');
       } else {
-        game.posture = clamp(game.posture - .018, .12, 1);
-        showFeedback(d < cfg.target ? '少し速すぎる。リズムを戻す' : '少し遅い。テンポを上げる', '');
+        game.posture = clamp(game.posture - .02, .12, 1);
+        showFeedback(d < cfg.target ? '速すぎる。リズムを戻す' : '遅すぎる。テンポを上げる', '');
       }
     }
     game.lastSide = side;
@@ -701,6 +715,7 @@
       game.firstInputDone = true;
       game.reaction = (now() - game.raceStartAt) / 1000;
     }
+    if (game.phase === 'turnglide') return;
     if (game.phase === 'underwater') {
       surfaceNow();
       return;
@@ -734,25 +749,43 @@
   }
 
   function tryTurn() {
+    if (game.phase !== 'surface') return false;
     var toWall = distanceToTurnWall();
-    if (toWall === 999) return false;
-    if (toWall <= 6.0 && toWall > 3.2) {
-      executeTurn('early', toWall);
-      return true;
-    }
-    if (toWall <= 3.2 && toWall >= .45) {
-      executeTurn('good', toWall);
-      return true;
-    }
-    if (toWall < .45 && toWall > -1.6) {
-      executeTurn('late', toWall);
-      return true;
-    }
-    return false;
+    if (toWall === 999 || toWall > 6.0 || toWall <= -1.6) return false;
+    var kind;
+    if (toWall < .45) kind = 'late';
+    else if (toWall > 3.2) kind = 'early';
+    else kind = Math.abs(toWall - 1.2) < .55 ? 'sweet' : 'good';
+    beginTurn(kind);
+    return true;
   }
 
-  function executeTurn(kind, toWall) {
+  // ロール(回転)開始。実際の背泳ぎ同様、壁までは推進なしのグライドで届いてから蹴る。
+  // 距離をワープさせると「早回し」が最速手になってしまうため、残距離は必ず泳がせる
+  function beginTurn(kind) {
     game.turned = true;
+    game.phase = 'turnglide';
+    game.pendingTurn = kind;
+    game.rollBias = 1;
+    game.speed = Math.max(game.speed * .96, .7);
+    centerLabel.textContent = '回転中';
+    phaseInfo.textContent = 'ターン動作';
+    if (kind === 'early') {
+      game.posture = clamp(game.posture - .13, .12, 1);
+      showFeedback('回転が早い。壁までグライドで大きくロス', 'bad');
+      beep(260, .18, 'sawtooth');
+    } else if (kind === 'late') {
+      showFeedback('壁ギリギリで回転。窮屈なターンに', 'bad');
+      beep(300, .14, 'sawtooth');
+    } else {
+      showFeedback(kind === 'sweet' ? 'ベストタイミングでロール' : 'ロールして壁へ', 'good');
+      beep(700, .08, 'triangle');
+    }
+    safeVibrate(kind === 'sweet' ? [25, 22, 25] : 45);
+  }
+
+  // 壁到達時のプッシュオフ。強さは回転タイミングの質で決まる
+  function pushOffWall(kind) {
     game.distance = 50;
     game.phase = 'underwater';
     game.underwaterStart = 50;
@@ -760,32 +793,38 @@
     centerLabel.textContent = '浮上';
     game.lastKickAt = 0;
     game.lastSide = '';
-    var abs = Math.abs(toWall - 1.2);
-    if (kind === 'good' && abs < .55) {
-      game.speed = Math.max(game.speed + .92, 3.6);
+    game.lastStrokeAt = 0;
+    game.pendingTurn = '';
+    if (kind === 'sweet') {
+      game.speed = 2.7;
       game.turnBonus = .16;
       game.posture = clamp(game.posture + .08, .12, 1);
       showFeedback('クイックターン成功。壁を強く蹴った', 'good');
       beep(960, .14, 'square');
     } else if (kind === 'good') {
-      game.speed = Math.max(game.speed + .35, 2.8);
+      game.speed = 2.4;
       game.turnBonus = .06;
       showFeedback('ターン成功。もう少し壁際で合わせたい', 'good');
       beep(820, .1, 'triangle');
     } else if (kind === 'early') {
-      game.speed = Math.max(game.speed * .72, 1.7);
-      game.posture = clamp(game.posture - .13, .12, 1);
+      game.speed = 1.9;
       game.turnBonus = 0;
-      showFeedback('ターンが早い。壁まで伸びきれず減速', 'bad');
-      beep(260, .18, 'sawtooth');
+      showFeedback('伸びを失ったぶん弱いプッシュに', 'bad');
+      beep(320, .14, 'sawtooth');
+    } else if (kind === 'crash') {
+      game.speed = 1.35;
+      game.posture = clamp(game.posture - .2, .12, 1);
+      game.turnBonus = 0;
+      showFeedback('壁に激突。ターン操作を忘れずに', 'bad');
+      beep(180, .22, 'sawtooth');
     } else {
-      game.speed = Math.max(game.speed * .64, 1.5);
+      game.speed = 1.7;
       game.posture = clamp(game.posture - .16, .12, 1);
       game.turnBonus = 0;
-      showFeedback('ターンが遅い。壁で詰まって減速', 'bad');
+      showFeedback('壁で詰まって弱いターンに', 'bad');
       beep(220, .18, 'sawtooth');
     }
-    safeVibrate(kind === 'good' ? [25, 22, 25] : 75);
+    safeVibrate(kind === 'sweet' ? [25, 22, 25] : 75);
   }
 
   function update(dt, t) {
@@ -796,24 +835,28 @@
     game.spurt = game.distanceGoal - game.distance <= 10;
     if (game.spurt && game.phase === 'surface') phaseInfo.textContent = 'ラストスパート';
 
-    var drag = (game.phase === 'underwater' ? .62 : .88) * cfg.drag;
-    var postureDrag = game.phase === 'surface' ? (1 - game.posture) * .78 + Math.abs(game.rollBias) * .22 : 0;
-    var staminaDrag = game.stamina < .28 ? (.28 - game.stamina) * 1.25 : 0;
-    game.speed -= (drag + postureDrag + staminaDrag) * dt;
+    var drag = (game.phase === 'underwater' ? .45 : game.phase === 'turnglide' ? .76 : .63) * cfg.drag;
+    var postureDrag = game.phase === 'surface' ? (1 - game.posture) * .45 + Math.abs(game.rollBias) * .16 : 0;
+    var staminaDrag = game.stamina < .28 ? (.28 - game.stamina) * .9 : 0;
+    // 抵抗は速度に比例させる。定数減速だと姿勢低下時に完全失速してゴール不能になる
+    game.speed -= (drag + postureDrag + staminaDrag) * (game.speed / 1.9) * dt;
     if (game.phase === 'surface' && game.stamina < .92) game.stamina = clamp(game.stamina + .018 * dt, 0, 1);
     if (game.phase === 'surface') game.posture = clamp(game.posture - (.012 + Math.abs(game.rollBias) * .01) * dt, .12, 1);
     game.rollBias *= Math.pow(.32, dt);
     game.turnBonus *= Math.pow(.25, dt);
-    game.speed = clamp(game.speed, 0, game.phase === 'underwater' ? 5.25 : (game.spurt ? 4.9 : 4.55));
+    game.speed = clamp(game.speed, game.phase === 'turnglide' ? .7 : 0, game.phase === 'underwater' ? 2.6 : (game.spurt ? 2.1 : 1.9));
 
     var prev = game.distance;
     game.distance += game.speed * dt;
 
-    if (game.distanceGoal === 100 && !game.turned && game.distance >= 50) {
-      game.split50 = game.elapsed;
-      executeTurn('late', -0.1);
-    }
     if (game.split50 === null && prev < 50 && game.distance >= 50) game.split50 = game.elapsed;
+    if (game.phase === 'turnglide' && game.distance >= 50) {
+      pushOffWall(game.pendingTurn || 'good');
+    }
+    if (game.distanceGoal === 100 && !game.turned && game.distance >= 50) {
+      game.turned = true;
+      pushOffWall('crash');
+    }
 
     if (game.phase === 'underwater') {
       game.underwaterMeters = game.distance - game.underwaterStart;
@@ -823,6 +866,9 @@
         disqualify('15m超過: 潜水距離 ' + game.underwaterMeters.toFixed(1) + 'm');
         return;
       }
+    } else if (game.phase === 'turnglide') {
+      phaseInfo.textContent = 'ターン動作';
+      centerLabel.textContent = '回転中';
     } else {
       centerLabel.textContent = distanceToTurnWall() <= 6 ? 'ターン' : '姿勢';
     }
@@ -845,16 +891,16 @@
   }
 
   function makeRank(time, goal, difficulty, stability, rhythm, combo) {
-    var base = goal === 50 ? 30 : 66;
+    var base = goal === 50 ? 27 : 54;
     base *= diffMap[difficulty].rank;
     var score = 100;
-    score -= Math.max(0, time - base) * 3.2;
+    score -= Math.max(0, time - base) * 2.6;
     score += Math.max(0, base - time) * 1.4;
     score += (stability - 80) * .35;
     score -= rhythm * 42;
     score += Math.min(combo, 24) * .45;
-    if (score >= 104) return 'SS';
-    if (score >= 94) return 'S';
+    if (score >= 112) return 'SS';
+    if (score >= 100) return 'S';
     if (score >= 82) return 'A';
     if (score >= 68) return 'B';
     if (score >= 52) return 'C';
@@ -891,7 +937,7 @@
       bests[key] = { time: result.time, name: result.name, date: result.date };
       safeSet(BEST_KEY, bests);
     }
-    var ranks = safeGet(STORAGE_KEY, []);
+    var ranks = safeGet(STORAGE_KEY + ':' + key, []);
     ranks.push(result);
     ranks = ranks.filter(function (r) { return r && !r.disq && r.distance === result.distance && r.difficulty === result.difficulty; });
     ranks.sort(function (a, b) { return a.time - b.time; });
@@ -991,7 +1037,7 @@
   }
 
   function shareX() {
-    var url = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(lastResultText + '\n#超背泳ぎタイムアタック');
+    var url = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(lastResultText + '\n#超背泳ぎタイムアタック\n' + location.href);
     try { window.open(url, '_blank', 'noopener,noreferrer'); } catch (e) { location.href = url; }
   }
 
@@ -1018,6 +1064,16 @@
     drawFlags(w, h);
     drawSwimmer(w, h);
     drawStartText(w, h);
+    drawStrobe(w, h);
+  }
+
+  // スタート号砲のストロボ閃光（全画面フラッシュ）
+  function drawStrobe(w, h) {
+    if (!game.strobeAt) return;
+    var k = 1 - (now() - game.strobeAt) / 320;
+    if (k <= 0) return;
+    ctx.fillStyle = 'rgba(255,255,255,' + (k * .65).toFixed(3) + ')';
+    ctx.fillRect(0, 0, w, h);
   }
 
   function drawWater(w, h) {
@@ -1270,6 +1326,30 @@
     window.visualViewport.addEventListener('resize', resizeCanvas);
     window.visualViewport.addEventListener('scroll', resizeCanvas);
   }
+
+  // 公開前検証用の読み取り専用ハンドル。通常プレイには影響しません。
+  window.__bsDebug = {
+    get mode() { return game.mode; },
+    get phase() { return game.phase; },
+    get distance() { return game.distance; },
+    get speed() { return game.speed; },
+    get elapsed() { return game.elapsed; },
+    get turned() { return game.turned; },
+    get pendingTurn() { return game.pendingTurn; },
+    get underwaterMeters() { return game.underwaterMeters; },
+    get stamina() { return game.stamina; },
+    get posture() { return game.posture; },
+    get combo() { return game.combo; },
+    get maxCombo() { return game.maxCombo; },
+    get reaction() { return game.reaction; },
+    get finishTime() { return game.finishTime; },
+    get disqualified() { return game.disqualified; },
+    get disqReason() { return game.disqReason; },
+    get rhythmAvg() { return game.rhythmCount ? game.rhythmSum / game.rhythmCount : 0; },
+    get rhythmCount() { return game.rhythmCount; },
+    get split50() { return game.split50; },
+    get spurt() { return game.spurt; }
+  };
 
   resizeCanvas();
   updateBestLine();
